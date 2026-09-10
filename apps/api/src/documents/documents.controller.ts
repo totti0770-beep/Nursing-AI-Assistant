@@ -21,6 +21,7 @@ import {
 } from '../common/decorators';
 import { DocumentsService } from './documents.service';
 import { ApprovalService } from '../approval/approval.service';
+import { InventoryService } from './inventory.service';
 
 class UploadDto {
   @IsString() @IsNotEmpty() title: string;
@@ -46,6 +47,7 @@ export class DocumentsController {
   constructor(
     private readonly documents: DocumentsService,
     private readonly approval: ApprovalService,
+    private readonly inventory: InventoryService,
   ) {}
 
   @ScreenForPhi({
@@ -84,6 +86,24 @@ export class DocumentsController {
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
     });
+  }
+
+  /**
+   * The clinical reference inventory: every ACTIVE document with the facts
+   * that decide whether the assistant can cite it.
+   *
+   * Declared before `@Get(':id')` deliberately — Express matches in
+   * declaration order, so below it the literal path would be taken as an id.
+   *
+   * `documents:read` is the right gate: every document fact here is already
+   * on the /policies screen for the same holders. What it adds is the
+   * indexing state next to them, which is what turns a list into an answer to
+   * "can this actually be cited".
+   */
+  @Get('inventory')
+  @Permissions(Permission.DOCUMENTS_READ)
+  inventoryReport() {
+    return this.inventory.build();
   }
 
   @Get(':id')

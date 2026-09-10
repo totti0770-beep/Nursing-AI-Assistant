@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Document, DocumentApproval, DocumentVersion } from '../entities';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
+import { InventoryService } from './inventory.service';
 import { ApprovalService } from '../approval/approval.service';
 import { RagModule } from '../rag/rag.module';
 
@@ -13,7 +14,7 @@ import { RagModule } from '../rag/rag.module';
     RagModule,
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService, ApprovalService],
-  exports: [DocumentsService, ApprovalService],
+  providers: [DocumentsService, ApprovalService, InventoryService],
+  exports: [DocumentsService, ApprovalService, InventoryService],
 })
 export class DocumentsModule {}
