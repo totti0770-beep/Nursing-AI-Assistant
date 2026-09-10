@@ -150,6 +150,11 @@ export class InventoryService {
            WHERE c.document_id = d.id
              AND c.version_number <> d.version_number
         ) old ON true
+       -- Two of retrieval's four filters live here: the ACTIVE status on the
+       -- next line, and the current-version match in the "cur" lateral join
+       -- above. The other two are applied in TypeScript below. Read the
+       -- coupling note on notRetrievableReason before changing either place.
+       -- (No backticks in this comment: it sits inside a template literal.)
        WHERE d.status = $1
        -- Deterministic: same database, same bytes. id breaks title ties.
        ORDER BY d.title, d.id
@@ -166,10 +171,36 @@ export class InventoryService {
       const expired = r.expiry_date !== null && new Date(r.expiry_date).getTime() <= now;
       const onActiveProvider = providers.includes(activeProvider);
 
-      // Mirrors the four filters in RetrievalService.search(): status is
-      // already ACTIVE by the WHERE clause, the chunk version matches by the
-      // lateral join, and the two that remain are checked here. Derived from
-      // stored facts only — nothing here is a guess about the document.
+      // ─────────────────────────────────────────────────────────────────
+      // COUPLED TO RetrievalService.search(). Change both or neither.
+      //
+      // `retrievable` answers "can the assistant cite this right now", and it
+      // is only worth trusting while it computes the *same* answer retrieval
+      // does. So it is derived from the same four filters
+      // (`retrieval.service.ts:71-74`), one for one:
+      //
+      //   d.status = ACTIVE                    → the WHERE clause of the query
+      //                                          above; non-ACTIVE rows never
+      //                                          reach this map.
+      //   d.expiry_date IS NULL OR > now()     → `expired`, below.
+      //   c.version_number = d.version_number  → the `cur` lateral join, so
+      //                                          chunkCount counts only what
+      //                                          retrieval would consider.
+      //   c.embedding_provider = <active>      → `onActiveProvider`, below.
+      //
+      // If a fifth filter is ever added to retrieval, or one of these four is
+      // changed, this block is wrong the moment it is not changed with it —
+      // and wrong quietly, because the report would still render and still
+      // look authoritative. A governance report that disagrees with the engine
+      // it describes is worse than no report: it is what someone signs.
+      //
+      // `test/inventory.e2e-spec.ts` pins each of the three uncitable states
+      // against a real database, so a drift here fails the build rather than
+      // being discovered by a reader.
+      //
+      // Everything below reads stored facts. Nothing here is a guess about a
+      // document.
+      // ─────────────────────────────────────────────────────────────────
       let notRetrievableReason: string | null = null;
       if (chunkCount === 0) {
         notRetrievableReason = 'No chunks on the current version — never indexed, or indexing failed.';
