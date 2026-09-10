@@ -13,6 +13,7 @@ import {
   AuthenticatedUser,
   CurrentUser,
   Permissions,
+  ScreenForPhi,
 } from '../common/decorators';
 import { ChatService } from './chat.service';
 
@@ -33,6 +34,9 @@ export class ChatController {
 
   @Post('ask')
   @Permissions(Permission.AI_ASK)
+  // The field this whole control exists for: free text a nurse types at the
+  // bedside, persisted verbatim to ai_questions.question.
+  @ScreenForPhi({ body: ['question'] })
   ask(@Body() dto: AskDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.chat.ask(dto, actor);
   }

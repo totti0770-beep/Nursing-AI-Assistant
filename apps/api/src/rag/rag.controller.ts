@@ -13,6 +13,7 @@ import {
   AuthenticatedUser,
   CurrentUser,
   Permissions,
+  ScreenForPhi,
 } from '../common/decorators';
 import { AuditService } from '../audit/audit.service';
 import { EmbeddingService, EMBEDDING_DIM } from './embedding.service';
@@ -229,6 +230,10 @@ export class RagController {
   /** Raw governed RAG answer (no persistence). Chat /ask persists + audits. */
   @Post('query')
   @Permissions(Permission.AI_ASK)
+  // Persists nothing, and is screened anyway — it reaches the LLM provider,
+  // so under LLM_PROVIDER=openai this text leaves the hospital. Stored text
+  // can be redacted later; sent text cannot be recalled.
+  @ScreenForPhi({ body: ['question'] })
   query(@Body() dto: RagQueryDto) {
     return this.ragQuery.ask(dto.question, { category: dto.category });
   }
@@ -236,6 +241,10 @@ export class RagController {
   /** Semantic search over approved documents — returns chunks, not answers. */
   @Get('search')
   @Permissions(Permission.AI_SEARCH)
+  // The query string, not a body: AllExceptionsFilter logs req.url on a 5xx,
+  // so an unscreened ?q= is the one path by which free text reaches the
+  // application log.
+  @ScreenForPhi({ query: ['q'] })
   async search(@Query('q') q: string, @Query('category') category?: string) {
     if (!q || !q.trim()) return { items: [] };
     const chunks = await this.retrieval.search(q, { category });

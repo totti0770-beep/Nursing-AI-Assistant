@@ -8,6 +8,16 @@ export const REFUSAL_MESSAGE_AR =
 export const DOSE_SAFETY_WARNING_AR =
   'لا يعتمد هذا الحساب دون مراجعة سريرية من المختص.';
 
+/**
+ * Returned verbatim when the PHI screen rejects an input. Contractual in the
+ * same way as the two strings above, and here for the same reason: the message
+ * a nurse sees when the platform refuses their input is part of the clinical
+ * contract, not a controller detail. It has to tell them what to remove — a
+ * bare "invalid input" teaches nothing and invites a retry with the same data.
+ */
+export const PHI_REJECTION_MESSAGE_AR =
+  'لا تُدخل بيانات تعريف المرضى. أعد صياغة السؤال دون رقم هوية أو رقم ملف أو تاريخ ميلاد أو رقم جوال أو اسم مريض.';
+
 export const PLATFORM_NAME = 'BNP Decision Guard';
 export enum DocumentCategory {
   MEDICATIONS = 'MEDICATIONS',

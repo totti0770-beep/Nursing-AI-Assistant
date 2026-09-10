@@ -100,6 +100,41 @@ export type JwtLifetime = number | `${number}${'s' | 'm' | 'h' | 'd' | 'w' | 'y'
 // silently lasts the wrong length of time.
 const LIFETIME_PATTERN = /^\d+(?:\.\d+)?[smhdwy]$/;
 
+/**
+ * The hospital's medical-record-number pattern, or `null` when it is not
+ * configured.
+ *
+ * It ships unset on purpose: the platform has no institutional MRN format yet,
+ * and guessing one produces a screen that either misses every real MRN or
+ * fires on batch numbers. The mechanism is complete and the other patterns run
+ * regardless — setting this one variable turns the MRN check on with no code
+ * change.
+ *
+ * A malformed pattern throws rather than being ignored. Falling back to "no
+ * MRN check" on a typo would disable a security control silently, which is the
+ * failure mode the NODE_ENV and RAG_MIN_SIMILARITY validation exists to
+ * prevent; the same reasoning applies here.
+ *
+ * `g` and `y` are stripped because `RegExp.test` on a sticky or global pattern
+ * advances `lastIndex`, so the same input would match on one call and not the
+ * next — a screen that lets every second request through.
+ */
+export function phiMrnPattern(): RegExp | null {
+  const raw = process.env.PHI_MRN_PATTERN?.trim();
+  if (!raw) return null;
+  try {
+    return new RegExp(raw, 'u');
+  } catch (err) {
+    throw new Error(
+      `[env] PHI_MRN_PATTERN is not a valid regular expression: ` +
+        `${err instanceof Error ? err.message : String(err)}. It is the ` +
+        `hospital's medical-record-number format; leave it unset to run the ` +
+        `other PHI patterns without it, but do not ship a broken one — a ` +
+        `pattern that cannot compile is a screen that never fires.`,
+    );
+  }
+}
+
 function jwtLifetime(name: string, fallback: JwtLifetime): JwtLifetime {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -212,6 +247,10 @@ export function loadEnv(): AppEnv {
         'MAIL_PROVIDER=smtp with MAIL_HOST before onboarding real users.',
     );
   }
+
+  // Validate here so a malformed pattern stops the boot rather than being
+  // discovered by the first request it fails to screen.
+  phiMrnPattern();
 
   const corsRaw = process.env.CORS_ORIGINS?.trim();
   const origins = corsRaw

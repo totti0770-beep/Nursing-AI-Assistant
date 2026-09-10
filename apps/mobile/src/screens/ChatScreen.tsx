@@ -337,35 +337,56 @@ export function ChatScreen({
       {/* Input bar */}
       <View
         style={{
-          flexDirection: row(lang),
-          alignItems: 'center',
-          gap: space.sm,
-          padding: space.md,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           backgroundColor: colors.card,
         }}
       >
-        <TouchableOpacity
-          style={[
-            s.btn,
-            { paddingHorizontal: space.lg, paddingVertical: 10 },
-            (busy || !question.trim()) && { opacity: 0.5 },
-          ]}
-          onPress={ask}
-          disabled={busy || !question.trim()}
+        {/*
+          Above the field, not after a rejection. The API screen is the control
+          that enforces this; the point of saying it here is that the nurse
+          never types the identifier in the first place.
+        */}
+        <Text
+          style={{
+            fontSize: 11,
+            color: colors.faint,
+            textAlign,
+            paddingHorizontal: space.md,
+            paddingTop: space.sm,
+          }}
         >
-          <Text style={s.btnText}>↵</Text>
-        </TouchableOpacity>
-        <TextInput
-          style={[s.input, { flex: 1, textAlign }]}
-          placeholder={t(lang, 'askPlaceholder')}
-          placeholderTextColor={colors.faint}
-          value={question}
-          onChangeText={setQuestion}
-          onSubmitEditing={ask}
-          multiline
-        />
+          {t(lang, 'phiWarning')}
+        </Text>
+        <View
+          style={{
+            flexDirection: row(lang),
+            alignItems: 'center',
+            gap: space.sm,
+            padding: space.md,
+          }}
+        >
+          <TouchableOpacity
+            style={[
+              s.btn,
+              { paddingHorizontal: space.lg, paddingVertical: 10 },
+              (busy || !question.trim()) && { opacity: 0.5 },
+            ]}
+            onPress={ask}
+            disabled={busy || !question.trim()}
+          >
+            <Text style={s.btnText}>↵</Text>
+          </TouchableOpacity>
+          <TextInput
+            style={[s.input, { flex: 1, textAlign }]}
+            placeholder={t(lang, 'askPlaceholder')}
+            placeholderTextColor={colors.faint}
+            value={question}
+            onChangeText={setQuestion}
+            onSubmitEditing={ask}
+            multiline
+          />
+        </View>
       </View>
     </KeyboardAvoidingView>
   );

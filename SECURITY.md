@@ -33,7 +33,130 @@ trail are non-negotiable.
 | **Full audit trail** | global `AuditInterceptor` + `AuditService` | Every login, question, answer (incl. refusals), document action, dose calculation, permission change and error is recorded with actor, IP and metadata. |
 | **MFA (TOTP)** | `otplib`, `/auth/mfa/{enroll,enable,disable,verify}` | Self-service two-step enrolment: `enroll` mints a secret without arming it, `enable` arms it only after verifying a live code, `disable` requires the account password. Login then issues a half-authenticated token exchangeable only at `/auth/mfa/verify`. |
 | **Answer governance review** | `GET /chat/answers`, `POST /chat/answers/:id/review`, `/answer-review` web screen | Pharmacist/quality/knowledge-manager roles review AI answers across all nurses (not just their own) and approve or flag them. Verified end-to-end incl. RBAC (nurse: 403 on both endpoints). |
+| **PHI screening on free-text input** | `packages/shared/src/phi.ts`, `common/guards/phi-screen.guard.ts`, `@ScreenForPhi` | Patient identifiers are rejected before any store is written. Four patterns are active — Saudi national ID/Iqama, full numeric date of birth, Saudi mobile, and explicit identifying phrases (`اسم المريض`, `patient name`, `MRN` …) — plus an optional hospital MRN format. Arabic-Indic digits fold to ASCII first, so switching keyboards is not a bypass. Rejection returns `PHI_REJECTION_MESSAGE_AR` from `@bnp/shared`, and the only record written is `SECURITY:PHI_BLOCKED` carrying the pattern categories, never the text. See *PHI screening* below. |
 | **Dependency vulnerability scanning** | `.github/workflows/ci.yml` (`security` job) | `npm audit --audit-level=critical` fails CI on any critical finding (hard gate); `--audit-level=high` reports the rest without blocking, since the two remaining findings require the Next.js 14→16 major (tracked in `docs/production-readiness.md`). |
+
+## PHI screening
+
+Free-text fields a clinician types into are screened for patient identifiers,
+and rejected input is never stored.
+
+### "Never stored" is structural, not a convention
+
+The screen runs as a **guard**, and Nest runs guards → interceptors → pipes →
+handler. Because the guard throws before the interceptor chain, a rejected
+request never reaches `AuditInterceptor` — so there is no `HTTP:POST:/chat/ask`
+row, no `ERROR:400` row, and no code path anywhere that could carry the body
+into the audit trail. The property "rejected text is written to no store" is
+therefore a consequence of *where the check runs*, not a promise about what
+each call site remembers not to log. A `class-validator` rule on the DTO would
+have run in the pipe, one stage later, and could not have made the same claim —
+nor could it have screened `GET /rag/search?q=`, which has no DTO at all.
+
+The only row written for a rejection is `SECURITY:PHI_BLOCKED`, carrying the
+actor, the route and the **pattern categories**. It never carries the text, any
+fragment of it, or a hash of it. `test/phi-screening.e2e-spec.ts` proves this
+against a real database by searching whole rows and whole `jsonb` documents
+(`::text LIKE`) rather than named columns — the requirement is "nowhere", not
+"not in the column we thought of".
+
+### The interception counter
+
+`SECURITY:PHI_BLOCKED` records a **per-category** breakdown from day one, not a
+single total. In the first weeks of use the operating question is not how many
+inputs were rejected but *which pattern is rejecting legitimate clinical
+questions*, and a total cannot answer that. Query it with
+`GET /audit?action=SECURITY:PHI_BLOCKED`.
+
+### Which fields, and why two profiles
+
+`FREE_TEXT` (all patterns) applies to the fields a clinician types a question
+into: `POST /chat/ask`, `POST /rag/query`, `GET /rag/search?q=`.
+
+`METADATA` (identifier patterns only — national ID, phone, MRN) applies to
+fields that describe a *document*: upload title/description/change note,
+`PATCH /documents/:id`, the four approval-comment routes, and dose formula
+name/drug/notes. Identifiers are never legitimate there either, but dates and
+names are — "supersedes the 2019-03-01 edition", "approved per Dr. Ali" is
+exactly what a change note is for. Running the strict profile over governance
+text would reject correct work, and a control that blocks correct work is a
+control that gets switched off.
+
+Three routes are screened for reasons worth stating:
+
+- **`POST /rag/query` persists nothing** and is screened anyway, because it
+  forwards the text to the LLM provider. Under `LLM_PROVIDER=openai` that text
+  leaves the hospital. Stored text can be redacted afterwards; sent text cannot
+  be recalled, which makes this the stricter case rather than the looser one.
+- **`GET /rag/search?q=`** carries free text in the URL, and
+  `AllExceptionsFilter` logs `req.url` on a 5xx. It is the one path by which a
+  question could reach the application log.
+- **The approval-comment routes** write the comment to two stores —
+  `document_approvals.comment` and the audit metadata written alongside it in
+  `approval.service.ts`.
+
+### Deliberately not screened
+
+- **`fullName` on `POST /users` / `PATCH /users/:id`** is a structured field for
+  staff names, and a name in it is its purpose. This control targets identifiers
+  that leak into a *free-text* field, not fields designed to hold a name.
+- **`PATCH /settings/:key`** takes `{ value: unknown }` — an operator-set
+  configuration value of unconstrained type. This is a **known, accepted
+  limitation** rather than a field judged out of scope: it is reachable only by
+  `settings:write` holders, and screening it would mean type-narrowing the
+  settings contract. Revisit if free-text settings are ever exposed more widely.
+
+### The MRN pattern ships disabled
+
+`PHI_MRN_PATTERN` is unset by default. The mechanism is complete and the other
+four patterns run regardless; setting this one environment variable to the
+hospital's medical-record-number format turns the MRN check on **with no code
+change**. It is unset because the platform has no institutional MRN format yet,
+and a guessed pattern either misses every real MRN or fires on batch numbers.
+
+A malformed pattern **fails the boot** rather than being ignored — falling back
+to "no MRN check" on a typo would disable a security control silently. Note
+that the regular expression is operator-supplied: a catastrophically
+backtracking pattern is the operator's responsibility. The four built-in
+patterns are linear-time by construction.
+
+### The gold set is the false-positive corpus, and its limits
+
+Every question in `GOLD_SET` (`apps/api/test/support/gold-set.ts`) is asserted
+against the live screen in `test/phi-screening.e2e-spec.ts`. Any pattern that
+rejects one of them fails the build.
+
+This is not belt-and-braces. The first version of the identifying-phrase
+pattern matched `patient id` as a prefix of "patient identifiers" and rejected
+*"Which two patient identifiers must be checked before administering a
+medication?"* — a medication-safety question a nurse asks constantly. Fourteen
+hand-written negative cases missed it; the gold set caught it on the first full
+run. Binding the two is what makes the screen safe to extend later.
+
+**Its limits, stated so no one reads it as more than it is.** The gold set is
+**16 cases**, and it is **circular by design** — the questions were authored
+from the four seeded demo documents they retrieve from (see the header of
+`gold-set.ts`). So it is a far broader false-positive corpus than any list
+maintained by hand, and it is **not** a representative sample of the questions
+real nurses ask. It cannot tell you the screen's false-positive rate in the
+ward; only the production counter can do that, and only once there is real
+traffic.
+
+The useful consequence: **every case added to the independent evaluation set in
+WI-2 strengthens this control automatically**, at no extra cost, because the
+same assertion runs over whatever the set contains. A wider clinical corpus is
+therefore a PHI-screening improvement as well as an evaluation one.
+
+### Known false positive
+
+The national-ID rule is *ten digits beginning with 1 or 2*, so **a ten-digit
+batch or catalogue number that happens to start with 1 or 2 is rejected**. This
+is accepted, and it is pinned by a test so it stays a decision on record rather
+than a surprise. The alternative — matching any ten digits — would reject batch
+numbers, catalogue codes and long dose figures indiscriminately, and a rule that
+blocks legitimate clinical questions gets disabled within a week, at which point
+there is no screen at all. It cannot be narrowed further without the hospital's
+real identifier format.
 
 ## Operational requirements before a real deployment
 
