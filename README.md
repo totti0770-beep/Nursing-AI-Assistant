@@ -220,6 +220,51 @@ prescribed-vs-calculated deviation warnings, and always the Arabic safety
 warning. Pharmacists manage formulas via `POST /dose/formulas` and
 `POST /dose/formulas/:id/approve`.
 
+## Clinical reference inventory
+
+What the assistant can actually cite right now, read straight out of the
+database. Two ways in, one implementation:
+
+```bash
+GET /documents/inventory            # permission: documents:read
+npm run inventory                   # human table
+npm run inventory -- --json         # deterministic JSON
+```
+
+The route is the one that matters in production: the API container ships
+without a shell, so the script cannot be run against the live deployment. The
+script is for local use, CI, and any machine that can reach the database.
+
+Per ACTIVE document: title, category, version, approval date, expiry date,
+current-version chunk count, superseded chunk count, embedding provider(s),
+first/last indexing time — and **whether the assistant can cite it**, with the
+reason when it cannot. Plus corpus totals.
+
+The last column is the point. A document can sit at `ACTIVE` in the governance
+workflow and still be uncitable — never indexed, past its expiry, or embedded
+by a provider that is no longer configured. It looks approved on every screen
+and answers nothing, and until this report there was no way to see that
+without a SQL client.
+
+**Two fields are reported as `null` because the database does not record
+them**, and both are named in `fieldsNotInSchema` so the gap is machine-
+readable rather than a footnote:
+
+| Field | Why |
+| --- | --- |
+| `issuingBody` | `documents` has no issuing-body, publisher or provenance column. **Not** inferred from the title or filename: a guess that is right often enough to be trusted and wrong often enough to mislead is worse than an honest blank. |
+| `effectiveDate` | `documents` has no effective-date column. `approvalDate` is reported separately under its own name — it is when *this platform* approved the document, not when an issuing authority made it effective. |
+
+Adding either means a migration and an upload-form field; neither is
+synthesised here.
+
+**The JSON carries no generation timestamp**, on purpose: two runs against an
+unchanged database produce byte-identical output, so reports diff cleanly
+against each other. The human view prints the time in its header, where it
+does not contaminate the data. An empty corpus is a supported state, not an
+error — it reports zero totals and says outright that the assistant refuses
+every question until a document is indexed.
+
 ## Tests
 
 ```bash

@@ -21,6 +21,16 @@ import { RagController } from './rag.controller';
     IndexingService,
     RagQueryService,
   ],
-  exports: [IndexingService, RagQueryService, RetrievalService, RerankService],
+  // EmbeddingService is exported for its `name` only: the inventory report has
+  // to say which provider is active to decide whether a document's chunks are
+  // still reachable, and that answer must come from the same object retrieval
+  // filters on rather than from a second read of the environment.
+  exports: [
+    IndexingService,
+    RagQueryService,
+    RetrievalService,
+    RerankService,
+    EmbeddingService,
+  ],
 })
 export class RagModule {}
