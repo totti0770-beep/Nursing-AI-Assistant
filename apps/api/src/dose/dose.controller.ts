@@ -16,11 +16,12 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { DoseFormulaType, Permission } from '@bnp/shared';
+import { DoseFormulaType, Permission, PhiProfile } from '@bnp/shared';
 import {
   AuthenticatedUser,
   CurrentUser,
   Permissions,
+  ScreenForPhi,
 } from '../common/decorators';
 import { DoseService } from './dose.service';
 
@@ -70,6 +71,10 @@ export class DoseController {
     return this.dose.listFormulas(all === 'true' && canSeeUnapproved);
   }
 
+  @ScreenForPhi({
+    body: ['name', 'drugName', 'notes'],
+    profile: PhiProfile.METADATA,
+  })
   @Post('formulas')
   @Permissions(Permission.DOSE_FORMULAS_MANAGE)
   createFormula(

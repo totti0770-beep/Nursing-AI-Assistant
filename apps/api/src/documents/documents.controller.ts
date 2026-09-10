@@ -12,11 +12,12 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { DocumentCategory, Permission } from '@bnp/shared';
+import { DocumentCategory, Permission, PhiProfile } from '@bnp/shared';
 import {
   AuthenticatedUser,
   CurrentUser,
   Permissions,
+  ScreenForPhi,
 } from '../common/decorators';
 import { DocumentsService } from './documents.service';
 import { ApprovalService } from '../approval/approval.service';
@@ -47,6 +48,10 @@ export class DocumentsController {
     private readonly approval: ApprovalService,
   ) {}
 
+  @ScreenForPhi({
+    body: ['title', 'description', 'changeNote'],
+    profile: PhiProfile.METADATA,
+  })
   @Post('upload')
   @Permissions(Permission.DOCUMENTS_UPLOAD)
   // 25 MB matches the cap the web upload screen enforces and advertises; the
@@ -87,6 +92,10 @@ export class DocumentsController {
     return this.documents.toDto(await this.documents.findOne(id));
   }
 
+  @ScreenForPhi({
+    body: ['title', 'description'],
+    profile: PhiProfile.METADATA,
+  })
   @Patch(':id')
   @Permissions(Permission.DOCUMENTS_MANAGE)
   update(
@@ -118,6 +127,10 @@ export class DocumentsController {
     return this.approval.history(id);
   }
 
+  // The comment lands in two stores — document_approvals.comment and the
+  // audit metadata written alongside it — so an identifier here is written
+  // twice.
+  @ScreenForPhi({ body: ['comment'], profile: PhiProfile.METADATA })
   @Post(':id/submit-review')
   @Permissions(Permission.DOCUMENTS_SUBMIT_REVIEW)
   submitReview(
@@ -128,6 +141,10 @@ export class DocumentsController {
     return this.approval.submitReview(id, actor, dto.comment);
   }
 
+  // The comment lands in two stores — document_approvals.comment and the
+  // audit metadata written alongside it — so an identifier here is written
+  // twice.
+  @ScreenForPhi({ body: ['comment'], profile: PhiProfile.METADATA })
   @Post(':id/approve')
   @Permissions(Permission.DOCUMENTS_APPROVE)
   approve(
@@ -138,6 +155,10 @@ export class DocumentsController {
     return this.approval.approve(id, actor, dto.comment);
   }
 
+  // The comment lands in two stores — document_approvals.comment and the
+  // audit metadata written alongside it — so an identifier here is written
+  // twice.
+  @ScreenForPhi({ body: ['comment'], profile: PhiProfile.METADATA })
   @Post(':id/reject')
   @Permissions(Permission.DOCUMENTS_APPROVE)
   reject(
@@ -157,6 +178,10 @@ export class DocumentsController {
     return this.approval.index(id, actor);
   }
 
+  // The comment lands in two stores — document_approvals.comment and the
+  // audit metadata written alongside it — so an identifier here is written
+  // twice.
+  @ScreenForPhi({ body: ['comment'], profile: PhiProfile.METADATA })
   @Post(':id/deactivate')
   @Permissions(Permission.DOCUMENTS_DEACTIVATE)
   deactivate(

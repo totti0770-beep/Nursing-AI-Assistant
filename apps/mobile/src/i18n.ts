@@ -50,6 +50,8 @@ export const dict = {
     doseCalculator: 'حاسبة الجرعات',
     // Chat
     askPlaceholder: 'اسأل عن دواء أو بروتوكول…',
+    phiWarning:
+      'لا تُدخل بيانات تعريف المرضى — لا رقم هوية أو ملف، ولا تاريخ ميلاد، ولا رقم جوال، ولا اسم مريض.',
     source: 'المصدر',
     page: 'ص',
     confidence: 'الثقة',
@@ -108,6 +110,8 @@ export const dict = {
     qualityStandards: 'CBAHI Quality Standards',
     doseCalculator: 'Dose Calculator',
     askPlaceholder: 'Ask about a medication or protocol…',
+    phiWarning:
+      'Do not enter patient identifiers — no ID or file number, date of birth, phone number or patient name.',
     source: 'Source',
     page: 'p.',
     confidence: 'Confidence',

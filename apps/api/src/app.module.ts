@@ -7,6 +7,7 @@ import { buildDataSourceOptions } from './config/data-source';
 import { loadEnv } from './config/env';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { PhiScreenGuard } from './common/guards/phi-screen.guard';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { HealthController } from './health.controller';
 import { AuthModule } from './auth/auth.module';
@@ -54,6 +55,12 @@ import { NotificationsModule } from './notifications/notifications.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // Last in the chain, and after authorization on purpose: the interception
+    // record needs the actor, and a caller who is not allowed on the route
+    // should be refused for that reason rather than told what the PHI screen
+    // thinks of their payload. Still before the interceptors and the
+    // ValidationPipe, so a rejected body reaches no store — see the guard.
+    { provide: APP_GUARD, useClass: PhiScreenGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })

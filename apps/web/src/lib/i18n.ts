@@ -168,6 +168,8 @@ export const dict = {
 
     // Assistant screens
     assistantTitle: 'AI Nursing Assistant',
+    phiWarning:
+      'Do not enter patient identifiers — no ID or file number, date of birth, phone number or patient name. Ask about the clinical situation instead.',
     assistantSubtitle:
       'Ask about policies, procedures, protocols and medications — answers cite approved documents only.',
     assistantPlaceholder:
@@ -578,6 +580,8 @@ export const dict = {
     systemActor: 'النظام',
 
     assistantTitle: 'المساعد التمريضي الذكي',
+    phiWarning:
+      'لا تُدخل بيانات تعريف المرضى — لا رقم هوية أو ملف، ولا تاريخ ميلاد، ولا رقم جوال، ولا اسم مريض. اسأل عن الحالة السريرية نفسها.',
     assistantSubtitle:
       'اسأل عن السياسات والإجراءات والبروتوكولات والأدوية — تستند الإجابات إلى وثائق معتمدة فقط.',
     assistantPlaceholder: 'مثال: كم مدة فرك اليدين بالمطهر الكحولي؟',

@@ -353,10 +353,16 @@ export function AssistantChat({
       </div>
 
       {/* Composer pinned to the bottom; on mobile this is the thumb zone. */}
-      <form
-        onSubmit={ask}
-        className="sticky bottom-0 flex gap-2 border-t border-border bg-bg/90 py-3 backdrop-blur"
-      >
+      <div className="sticky bottom-0 border-t border-border bg-bg/90 backdrop-blur">
+        {/*
+          Stated before the field, not after a rejection. The server screen is
+          the control; this is what stops a nurse typing an identifier in the
+          first place, which is the outcome that actually matters — a blocked
+          request has already been composed, and the habit is what carries to
+          the next question.
+        */}
+        <p className="pt-2 text-2xs text-subtle">{t('phiWarning')}</p>
+        <form onSubmit={ask} className="flex gap-2 py-3">
         <input
           ref={inputRef}
           className="h-10 w-full rounded-control border border-border-strong bg-surface px-3 text-sm text-text transition-colors placeholder:text-subtle hover:border-subtle"
@@ -373,9 +379,10 @@ export function AssistantChat({
           loading={busy}
           disabled={!question.trim()}
         >
-          {t('ask')}
-        </Button>
-      </form>
+            {t('ask')}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }
